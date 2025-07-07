@@ -1,0 +1,11 @@
+Vagrant.configure("2") do |config|
+  config.vm.define "ansible-controller" do |controller|
+    controller.vm.box = "almalinux/8"
+    controller.vm.hostname = "controller"
+    controller.vm.network "private_network", type: "dhcp"
+    controller.vm.provision "shell", inline: <<-SHELL
+      sudo dnf install -y epel-release
+      sudo dnf install -y ansible
+    SHELL
+  end
+end

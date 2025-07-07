@@ -1,0 +1,67 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "almalinux/8"
+
+  # Define common VM settings that apply to both 'web' and 'db' if needed
+  # For now, we'll apply them specifically to 'web'
+  config.vm.provider "virtualbox" do |vb|
+    # Increase base memory to at least 2GB (2048 MB) for Kubernetes control plane
+    vb.memory = 2048
+    # Increase CPU to at least 2 cores for Kubernetes control plane
+    vb.cpus = 2
+  end
+
+  # Node for Kubernetes Control Plane (web node)
+  config.vm.define "web" do |web|
+    web.vm.hostname = "web"
+    web.vm.network "private_network", ip: "192.168.33.10"
+
+    # Specific VirtualBox settings for the 'web' VM if they differ from global
+    web.vm.provider "virtualbox" do |vb|
+      # You can override global settings here if needed, e.g.:
+      # vb.memory = 3072 # 3GB RAM if you want more for the control plane
+      # vb.cpus = 4    # 4 CPUs for better performance
+    end
+
+    # Provisioner to prepare the 'web' node for Kubernetes
+    web.vm.provision "shell", inline: <<-SHELL
+      echo "--- Starting initial VM setup for Kubernetes (web node) ---"
+
+      # Disable swap permanently (crucial for Kubernetes)
+      echo "Disabling swap..."
+      sudo swapoff -a
+      sudo sed -i '/ swap / s/^/#/' /etc/fstab
+      echo "Swap disabled."
+
+      # Update kernel and other packages
+      # Note: This will update the kernel, but you'll need to 'vagrant reload'
+      #       to boot into the new kernel if it's installed.
+      echo "Updating system packages and kernel..."
+      sudo dnf update -y --refresh
+      echo "System update complete. Checking kernel version..."
+      uname -r
+
+      echo "--- Initial VM setup complete ---"
+    SHELL
+  end
+
+  # Node for Database (db node - not directly used by Kubernetes yet)
+  config.vm.define "db" do |db|
+    db.vm.hostname = "db"
+    db.vm.network "private_network", ip: "192.168.33.11"
+    # You might want to add resource allocation for db here too if it's heavily used
+    # db.vm.provider "virtualbox" do |vb|
+    #   vb.memory = 1024
+    #   vb.cpus = 1
+    # end
+  end
+
+  # Forwarded ports for the primary VM (web, if not specified for a define block)
+  # This typically applies to the 'web' VM if it's the first one defined or the default.
+  config.vm.network "forwarded_port", guest: 80, host: 8080, auto_correct: true
+
+  # Set the usable port range for auto_correct to avoid conflicts
+  config.vm.usable_port_range = (8000..9000)
+end
